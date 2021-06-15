@@ -417,3 +417,13 @@ func getDatastore(f *find.Finder, ds string) (*object.Datastore, error) {
 	dso, err := f.DefaultDatastore(context.TODO())
 	return dso, err
 }
+
+// getDatastoreCluster gets storagePod object
+func getDatastoreCluster(f *find.Finder, dsc string) (*object.StoragePod, error) {
+	if dsc != "" {
+		sp, err := f.DatastoreCluster(context.TODO(), dsc)
+		return sp, err
+	}
+	sp, err := f.DefaultDatastoreCluster(context.TODO())
+	return sp, err
+}
