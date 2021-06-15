@@ -73,6 +73,7 @@ func resourceVSphereVirtualDisk() *schema.Resource {
 			"datastore_cluster": {
 				Type:          schema.TypeString,
 				Optional:      true,
+				ForceNew:      true,
 				ConflictsWith: []string{"datastore"},
 				Description:   "The ID of a datastore cluster to put the virtual disk in.",
 			},
