@@ -25,6 +25,7 @@ type virtualDisk struct {
 	adapterType       string
 	datacenter        string
 	datastore         string
+	datastore_cluster string
 	createDirectories bool
 }
 
@@ -64,9 +65,16 @@ func resourceVSphereVirtualDisk() *schema.Resource {
 			},
 
 			"datastore": {
-				Type:     schema.TypeString,
-				Required: true,
-				ForceNew: true,
+				Type:          schema.TypeString,
+				Optional:      true,
+				ForceNew:      true,
+				ConflictsWith: []string{"datastore_cluster"},
+			},
+			"datastore_cluster": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				ConflictsWith: []string{"datastore"},
+				Description:   "The ID of a datastore cluster to put the virtual disk in.",
 			},
 
 			"type": {
@@ -144,6 +152,10 @@ func resourceVSphereVirtualDiskCreate(d *schema.ResourceData, meta interface{}) 
 		vDisk.datastore = v.(string)
 	}
 
+	if v, ok := d.GetOk("datastore_cluster"); ok {
+		vDisk.datastore_cluster = v.(string)
+	}
+
 	if v, ok := d.GetOk("create_directories"); ok {
 		vDisk.createDirectories = v.(bool)
 	}
@@ -156,14 +168,24 @@ func resourceVSphereVirtualDiskCreate(d *schema.ResourceData, meta interface{}) 
 	}
 	finder = finder.SetDatacenter(dc)
 
-	ds, err := getDatastore(finder, vDisk.datastore)
-	if err != nil {
-		return fmt.Errorf("Error finding Datastore: %s: %s", vDisk.datastore, err)
-	}
+	var ds *object.Datastore
+	path := vDisk.vmdkPath
+	//var sp *object.StoragePod
+	if vDisk.datastore != "" {
+		ds, err = getDatastore(finder, vDisk.datastore)
+		if err != nil {
+			return fmt.Errorf("Error finding Datastore: %s: %s", vDisk.datastore, err)
+		}
+	} /*else {
+		sp, err := getDatastoreCluster(finder, vDisk.datastore_cluster)
+		if err != nil {
+			return fmt.Errorf("Error finding DatastoreCluster: %s: %s", vDisk.datastore_cluster, err)
+		}
+	}*/
 
 	fm := object.NewFileManager(client.Client)
 
-	if vDisk.createDirectories {
+	if vDisk.createDirectories && vDisk.datastore != "" {
 		directoryPathIndex := strings.LastIndex(vDisk.vmdkPath, "/")
 		if directoryPathIndex > 0 {
 			vmdkPath := vDisk.vmdkPath[0:directoryPathIndex]
@@ -180,9 +202,13 @@ func resourceVSphereVirtualDiskCreate(d *schema.ResourceData, meta interface{}) 
 				return err
 			}
 		}
+		path = ds.Path(vDisk.vmdkPath)
+	} else if vDisk.datastore_cluster != "" {
+		//TODO: do we need to check createDirectory
+
 	}
 
-	err = createHardDisk(client, vDisk.size, ds.Path(vDisk.vmdkPath), vDisk.initType, vDisk.adapterType, vDisk.datacenter)
+	err = createHardDisk(client, vDisk.size, path, vDisk.initType, vDisk.adapterType, vDisk.datacenter)
 	if err != nil {
 		return err
 	}
